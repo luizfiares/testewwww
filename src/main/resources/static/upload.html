@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Upload de Arquivo</title>
+        <style>
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            table, th, td {
+                border: 1px solid black;
+            }
+            th, td {
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+        </style>
+    </head>
+<body>
+<h1>Upload de Arquivo</h1>
+<form id="uploadForm" enctype="multipart/form-data" method="post" action="/api/files/upload">
+    <input type="file" name="file" id="fileInput">
+    <button type="button" onclick="uploadFile()">Salvar na Base</button>
+
+    <br>
+    <br>
+    <br>
+
+    <input type="text" name="idUser" id="idUserInput" placeholder="ID do Usuário">
+    <button type="button" onclick="getUserById(document.getElementById('idUserInput').value)">Consultar Usuário</button>
+    <button type="button" onclick="getAllUsers()">Consultar Todos os Usuários</button>
+
+</form>
+<br>
+<br>
+<form id="dateRangeForm" enctype="multipart/form-data" method="post" action="/api/files/users/by-date-range">
+    <label for="startDateInput">Data de Início (YYYYMMDD):</label>
+    <input type="text" id="startDateInput" name="start_date" placeholder="YYYYMMDD" maxlength="8">
+
+    <br><br><br>
+    <label for="endDateInput">Data de Fim (YYYYMMDD):</label>
+    <input type="text" id="endDateInput" name="end_date" placeholder="YYYYMMDD" maxlength="8">
+    <button type="button" onclick="fetchDataByDateRange()">Consultar por Intervalo de Data</button>
+    <div id="dateError" class="error"></div>
+</form>
+
+
+
+
+<div id="userInfo"></div>
+<div id="usersGrid"></div>
+<script>
+    function uploadFile() {
+        const form = document.getElementById('uploadForm');
+        const formData = new FormData(form);
+
+        fetch('/api/files/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao enviar arquivo');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Arquivo enviado com sucesso:', data);
+        })
+        .catch(error => {
+            console.error('Erro ao enviar arquivo:', error.message);
+        });
+    }
+
+    function clearUserIdInput() {
+    const idUserInput = document.getElementById('idUserInput');
+    idUserInput.value = ''; // Limpa o valor do campo de entrada
+}
+
+    function fetchUser() {
+        const idUser = document.getElementById('idUserInput').value;
+        if (idUser) {
+            getUserById(idUser);
+        }
+    }
+
+    function getUserById(id) {
+    clearUserInfo();
+        fetch(`/api/files/user/${id}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar usuário');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Usuário encontrado:', data);
+            displayUser(data);
+        })
+        .catch(error => {
+            console.error('Erro ao buscar usuário:', error.message);
+        });
+    }
+
+    function getAllUsers() {
+    clearUserIdInput();
+        fetch('/api/files/users')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar usuários');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Usuários encontrados:', data);
+            displayUsers(data);
+        })
+        .catch(error => {
+            console.error('Erro ao buscar usuários:', error.message);
+        });
+    }
+
+    function displayUser(user) {
+    clearUserInfo();
+        const userInfo = document.getElementById('userInfo');
+        userInfo.innerHTML = `
+            <h2>Dados do Usuário</h2>
+            <p>ID: ${user.userId}</p>
+            <p>Nome: ${user.name}</p>
+            <h3>Pedidos</h3>
+            <ul>
+                ${user.orders.map(order => `
+                    <li>
+                        <p>ID do Pedido: ${order.orderId}</p>
+                        <p>Total: ${order.total}</p>
+                        <p>Data: ${order.date}</p>
+                        <ul>
+                            ${order.products.map(product => `
+                                <li>
+                                    <p>ID do Produto: ${product.productId}</p>
+                                    <p>Valor: ${product.productValue}</p>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    }
+
+
+     function isValidDate(date) {
+    return /^\d{8}$/.test(date);
+}
+
+function fetchDataByDateRange() {
+    clearUserIdInput();
+    clearUserInfo();
+    const startDateInput = document.getElementById('startDateInput').value;
+    const endDateInput = document.getElementById('endDateInput').value;
+    const dateError = document.getElementById('dateError');
+
+    // Verificar se os valores são inteiros
+    const startDate = parseInt(startDateInput, 10);
+    const endDate = parseInt(endDateInput, 10);
+
+    // Verificar se os valores convertidos são números válidos e se o formato é correto
+    if (isNaN(startDate) || isNaN(endDate) || !isValidDate(startDateInput) || !isValidDate(endDateInput)) {
+        dateError.textContent = 'Por favor, insira datas válidas no formato YYYYMMDD.';
+        return;
+    } else {
+        dateError.textContent = '';
+    }
+
+    fetch(`/api/files/users/data?start_date=${startDateInput}&end_date=${endDateInput}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao buscar dados por intervalo de data');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dados encontrados:', data);
+            displayUsers(data); // Chamada da função para exibir os usuários
+        })
+        .catch(error => {
+            console.error('Erro ao buscar dados por intervalo de data:', error.message);
+        });
+}
+
+function displayUsers(users) {
+    clearUserInfo();
+    const usersGrid = document.getElementById('usersGrid');
+    usersGrid.innerHTML = `
+        <h2>Lista de Usuários</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Pedidos</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${users.map(user => `
+                    <tr>
+                        <td>${user.userId}</td>
+                        <td>${user.name}</td>
+                        <td>
+                            <ul>
+                                ${user.orders.map(order => `
+                                    <li>
+                                        <p>ID do Pedido: ${order.orderId}</p>
+                                        <p>Total: ${order.total}</p>
+                                        <p>Data: ${order.date}</p>
+                                        <ul>
+                                            ${order.products.map(product => `
+                                                <li>
+                                                    <p>ID do Produto: ${product.productId}</p>
+                                                    <p>Valor: ${product.productValue}</p>
+                                                </li>
+                                            `).join('')}
+                                        </ul>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+function clearUserInfo() {
+    const userInfo = document.getElementById('userInfo');
+        const usersGrid = document.getElementById('usersGrid');
+    usersGrid.innerHTML = ''; // Limpa o conteúdo do elemento
+    userInfo.innerHTML = ''; // Limpa o conteúdo do elemento
+}
+
+
+    function displayUsers(users) {
+     clearUserInfo();
+        const usersGrid = document.getElementById('usersGrid');
+        usersGrid.innerHTML = `
+            <h2>Lista de Usuários</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Pedidos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${users.map(user => `
+                        <tr>
+                            <td>${user.userId}</td>
+                            <td>${user.name}</td>
+                            <td>
+                                <ul>
+                                    ${user.orders.map(order => `
+                                        <li>
+                                            <p>ID do Pedido: ${order.orderId}</p>
+                                            <p>Total: ${order.total}</p>
+                                            <p>Data: ${order.date}</p>
+                                            <ul>
+                                                ${order.products.map(product => `
+                                                    <li>
+                                                        <p>ID do Produto: ${product.productId}</p>
+                                                        <p>Valor: ${product.productValue}</p>
+                                                    </li>
+                                                `).join('')}
+                                            </ul>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+</script>
+</body>
+</html>
